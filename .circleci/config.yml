@@ -1,0 +1,125 @@
+version: 2
+jobs:
+  build:
+    working_directory: ~/semir
+    parallelism: 3
+    docker:
+      - image: circleci/ruby:2.5.1-node-browsers
+        environment:
+          PGHOST: 127.0.0.1
+          PGUSER: semir
+          MYAPP_DATABASE_HOST_PATH: localhost
+          MYAPP_DATABASE_USERNAME: semir
+          RAILS_ENV: test
+          CHROME_BIN: /usr/bin/google-chrome
+      - image: circleci/postgres:9.6-alpine
+        environment:
+          POSTGRES_USER: semir
+          POSTGRES_DB: semir_test
+          POSTGRES_PASSWORD: ""
+      - image: yukinying/chrome-headless-browser
+      #   environment:
+      #     DISPLAY: 99
+      #     CHROME_BIN: /usr/bin/google-chrome
+    steps:
+      - checkout
+      - run:
+          name: Which bundler?
+          command: bundle -v
+      - restore_cache:
+          keys:
+            - rails-semir-bundle-v2-{{ checksum "Gemfile.lock" }}
+            - rails-semir-bundle-v2-
+      - run:
+          name: Bundle Install
+          command: bundle check || bundle install --jobs=3 --retry=3 --path vendor/bundle
+      - save_cache:
+          key: rails-semir-bundle-v2-{{ checksum "Gemfile.lock" }}
+          paths:
+            - vendor/bundle
+      - restore_cache:
+          keys:
+            - rails-semir-yarn-{{ checksum "yarn.lock" }}
+            - rails-semir-yarn-
+      - run:
+          name: Yarn Install
+          command: yarn install --cache-folder ~/.cache/yarn
+      - save_cache:
+          key: rails-semir-yarn-{{ checksum "yarn.lock" }}
+          paths:
+            - ~/.cache/yarn
+      - run:
+          name: Wait for DB
+          command: dockerize -wait tcp://localhost:5432 -timeout 1m
+      - run:
+          name: Database setup
+          command: bin/rails db:schema:load --trace
+      - run:
+          name: Update Chromedriver
+          command: |
+            wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+            sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
+            sudo apt-get update
+            sudo apt-get install google-chrome-stable
+      # - run: mkdir test-reports
+      # - run:
+      #     name: Download Selenium
+      #     command: |
+      #       curl -O http://selenium-release.storage.googleapis.com/3.5/selenium-server-standalone-3.5.3.jar
+      # - run:
+      #     name: Start Selenium
+      #     command: |
+      #       java -jar selenium-server-standalone-3.5.3.jar -log test-reports/selenium.log
+      #       Xvfb -ac :99 -screen
+      #     #background: true
+      - run:
+          name: Run rspec in parallel
+          command: |
+            bundle exec rspec spec/features
+      - store_test_results:
+          path: tmp/test-results
+      # - store_artifacts:
+      #     path: tmp/test-results
+      #     destination: test-results
+  deploy:
+    docker:
+      - image: buildpack-deps:trusty
+        environment:
+          EMAIL: dg@narola.email
+          PASSWORD: 8ae67c8c-57dd-490b-86d8-4abc8e708bd4
+    steps:
+      - checkout
+      - run:
+          name: Heroku CLI Install
+          command: |
+            curl https://cli-assets.heroku.com/install.sh | sh
+      - run:
+          name: Deploy Master to Heroku
+          command: |
+            git push https://heroku:8ae67c8c-57dd-490b-86d8-4abc8e708bd4@git.heroku.com/rspec-semir.git master
+      - run:
+          name: Heroku Migration
+          command: |
+            heroku run rails db:migrate -a rspec-semir
+            sleep 5
+            heroku restart -a rspec-semir
+        #    heroku open -a rspec-semir
+        #    heroku login
+        #    login dg@narola.email
+        #    password 8ae67c8c-57dd-490b-86d8-4abc8e708bd4
+        #  git push git@heroku.com:semir.git $CIRCLE_SHA1:master
+        # environment:
+        #   HEROKU_EMAIL: dg@narola.email
+        #   HEROKU_PASSWORD: 8ae67c8c-57dd-490b-86d8-4abc8e708bd4
+
+workflows:
+  version: 2
+  build-deploy:
+    jobs:
+      - build
+      - deploy:
+          requires:
+            - build
+          filters:
+            branches:
+              only: master
