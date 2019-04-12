@@ -1,21 +1,21 @@
 version: 2
 jobs:
   build:
-    working_directory: ~/semir
+    working_directory: ~/testApi
     parallelism: 3
     docker:
-      - image: circleci/ruby:2.5.1-node-browsers
+      - image: circleci/ruby:2.4.0-node-browsers
         environment:
           PGHOST: 127.0.0.1
-          PGUSER: semir
+          PGUSER: c200
           MYAPP_DATABASE_HOST_PATH: localhost
-          MYAPP_DATABASE_USERNAME: semir
+          MYAPP_DATABASE_USERNAME: c200
           RAILS_ENV: test
           CHROME_BIN: /usr/bin/google-chrome
       - image: circleci/postgres:9.6-alpine
         environment:
-          POSTGRES_USER: semir
-          POSTGRES_DB: semir_test
+          POSTGRES_USER: c200
+          POSTGRES_DB: api_test_dev
           POSTGRES_PASSWORD: ""
       - image: yukinying/chrome-headless-browser
       #   environment:
@@ -28,24 +28,24 @@ jobs:
           command: bundle -v
       - restore_cache:
           keys:
-            - rails-semir-bundle-v2-{{ checksum "Gemfile.lock" }}
-            - rails-semir-bundle-v2-
+            - rails-testApi-bundle-v2-{{ checksum "Gemfile.lock" }}
+            - rails-testApi-bundle-v2-
       - run:
           name: Bundle Install
           command: bundle check || bundle install --jobs=3 --retry=3 --path vendor/bundle
       - save_cache:
-          key: rails-semir-bundle-v2-{{ checksum "Gemfile.lock" }}
+          key: rails-testApi-bundle-v2-{{ checksum "Gemfile.lock" }}
           paths:
             - vendor/bundle
       - restore_cache:
           keys:
-            - rails-semir-yarn-{{ checksum "yarn.lock" }}
-            - rails-semir-yarn-
+            - rails-testApi-yarn-{{ checksum "yarn.lock" }}
+            - rails-testApi-yarn-
       - run:
           name: Yarn Install
           command: yarn install --cache-folder ~/.cache/yarn
       - save_cache:
-          key: rails-semir-yarn-{{ checksum "yarn.lock" }}
+          key: rails-testApi-yarn-{{ checksum "yarn.lock" }}
           paths:
             - ~/.cache/yarn
       - run:
@@ -72,12 +72,6 @@ jobs:
       #       java -jar selenium-server-standalone-3.5.3.jar -log test-reports/selenium.log
       #       Xvfb -ac :99 -screen
       #     #background: true
-      - run:
-          name: Run rspec in parallel
-          command: |
-            bundle exec rspec spec/features
-      - store_test_results:
-          path: tmp/test-results
       # - store_artifacts:
       #     path: tmp/test-results
       #     destination: test-results
@@ -96,18 +90,18 @@ jobs:
       - run:
           name: Deploy Master to Heroku
           command: |
-            git push https://heroku:8ae67c8c-57dd-490b-86d8-4abc8e708bd4@git.heroku.com/rspec-semir.git master
+            git push https://heroku:0a8d4a69-635e-4b1d-9611-9f7951c03b26@git.heroku.com/nameless-hamlet-76590.git master
       - run:
           name: Heroku Migration
           command: |
-            heroku run rails db:migrate -a rspec-semir
+            heroku run rails db:migrate -a nameless-hamlet-76590
             sleep 5
-            heroku restart -a rspec-semir
-        #    heroku open -a rspec-semir
+            heroku restart -a nameless-hamlet-76590
+        #    heroku open -a rspec-testApi
         #    heroku login
         #    login dg@narola.email
         #    password 8ae67c8c-57dd-490b-86d8-4abc8e708bd4
-        #  git push git@heroku.com:semir.git $CIRCLE_SHA1:master
+        #  git push git@heroku.com:testApi.git $CIRCLE_SHA1:master
         # environment:
         #   HEROKU_EMAIL: dg@narola.email
         #   HEROKU_PASSWORD: 8ae67c8c-57dd-490b-86d8-4abc8e708bd4
