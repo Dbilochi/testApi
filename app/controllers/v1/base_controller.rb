@@ -8,7 +8,7 @@ class V1::BaseController < ApplicationController
       :confirm
     ]
   )
-  after_action :set_access_control_headers
+  after_action :set_access_control_headers 
 
   attr_reader :current_user
 
